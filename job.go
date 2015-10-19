@@ -5,4 +5,5 @@ type Job struct {
 	ID    string
 	Data  string
 	Queue string
+	Nacks int
 }

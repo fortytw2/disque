@@ -163,6 +163,7 @@ func (pool *Pool) Get(queues ...string) (*Job, error) {
 		"GETJOB",
 		"TIMEOUT",
 		int(pool.conf.Timeout.Nanoseconds() / 1000000),
+		"WITHCOUNTERS",
 		"FROM",
 	}
 	for _, arg := range queues {
@@ -179,7 +180,7 @@ func (pool *Pool) Get(queues ...string) (*Job, error) {
 		return nil, errors.New("unexpected reply #1")
 	}
 	arr, ok := replyArr[0].([]interface{})
-	if !ok || len(arr) != 3 {
+	if !ok {
 		return nil, errors.New("unexpected reply #2")
 	}
 
@@ -198,10 +199,16 @@ func (pool *Pool) Get(queues ...string) (*Job, error) {
 		return nil, errors.New("unexpected reply: data")
 	}
 
+	nacks, ok := arr[4].(int64)
+	if !ok {
+		return nil, errors.New("unexpected reply: nacks")
+	}
+
 	return &Job{
 		ID:    string(id),
 		Data:  string(data),
 		Queue: string(que),
+		Nacks: int(nacks),
 	}, nil
 }
 
@@ -222,9 +229,10 @@ func (pool *Pool) Nack(job *Job) error {
 	sess := pool.redis.Get()
 	defer sess.Close()
 
-	if _, err := sess.Do("ENQUEUE", job.ID); err != nil {
+	if _, err := sess.Do("NACK", job.ID); err != nil {
 		return err
 	}
+
 	return nil
 }
 
